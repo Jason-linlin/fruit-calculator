@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>水果進貨管理</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
@@ -21,21 +21,21 @@
   <div id="currentTime" style="font-weight: bold;">現在時間：--:--:--</div><br>
 
   <label>品名：</label>
-  <input type="text" id="fruitName" placeholder="輸入品名" />
+  <input type="text" id="fruitName" placeholder="輸入品名">
   <select id="fruitSelect" onchange="selectFruit()" style="margin-top:5px;"></select>
   <button onclick="deleteFruitOption()">刪除選擇的品名</button><br><br>
 
   <label>貨主：</label>
-  <input type="text" id="owner" placeholder="輸入貨主" />
+  <input type="text" id="owner" placeholder="輸入貨主">
 
   <label>Size：</label>
-  <input type="text" id="size" placeholder="輸入Size" />
+  <input type="text" id="size" placeholder="輸入Size">
 
   <label>單價：</label>
-  <input type="number" id="price" placeholder="輸入單價" />
+  <input type="number" inputmode="numeric" id="price" placeholder="輸入單價" />
 
   <label>進貨數量：</label>
-  <input type="number" id="quantity" placeholder="輸入進貨數量" />
+  <input type="number" inputmode="numeric" id="quantity" placeholder="輸入進貨數量" />
 
   <button onclick="addEntry()">新增進貨資料</button>
   <button onclick="exportToExcel()">匯出 Excel 並清空</button>
@@ -69,7 +69,11 @@
     updateTime();
 
     function addEntry() {
-      const name = document.getElementById('fruitName').value.trim();
+      const select = document.getElementById('fruitSelect');
+      const selectedFruit = select.value;
+      const inputFruit = document.getElementById('fruitName').value.trim();
+      const name = selectedFruit ? selectedFruit : inputFruit;
+
       const owner = document.getElementById('owner').value.trim();
       const size = document.getElementById('size').value.trim();
       const price = document.getElementById('price').value.trim();
@@ -90,6 +94,7 @@
       document.getElementById('size').value = '';
       document.getElementById('price').value = '';
       document.getElementById('quantity').value = '';
+      document.getElementById('fruitSelect').selectedIndex = 0;
     }
 
     function addRow(data) {
@@ -102,6 +107,11 @@
       newRow.insertCell(4).innerText = data.quantity;
 
       const controlCell = newRow.insertCell(5);
+      const editBtn = document.createElement('button');
+      editBtn.innerText = '編輯';
+      editBtn.className = 'edit-btn';
+      editBtn.onclick = function () { enableEdit(newRow, editBtn); };
+
       const deleteBtn = document.createElement('button');
       deleteBtn.innerText = '刪除';
       deleteBtn.className = 'delete-btn';
@@ -110,8 +120,28 @@
         saveToLocalStorage();
         updateTotalQuantity();
       };
+
+      controlCell.appendChild(editBtn);
       controlCell.appendChild(deleteBtn);
       updateTotalQuantity();
+    }
+
+    function enableEdit(row, editBtn) {
+      for (let i = 0; i <= 4; i++) {
+        row.cells[i].innerHTML = `<input type="text" value="${row.cells[i].innerText}">`;
+      }
+      editBtn.innerText = '儲存';
+      editBtn.onclick = function () { saveEdit(row, editBtn); };
+    }
+
+    function saveEdit(row, editBtn) {
+      for (let i = 0; i <= 4; i++) {
+        row.cells[i].innerText = row.cells[i].querySelector('input').value;
+      }
+      editBtn.innerText = '編輯';
+      editBtn.onclick = function () { enableEdit(row, editBtn); };
+      updateTotalQuantity();
+      saveToLocalStorage();
     }
 
     function updateTotalQuantity() {
@@ -151,7 +181,6 @@
     function exportToExcel() {
       const now = new Date();
       const fileNameTime = now.toISOString().replace(/[:.]/g, '-');
-
       const wb = XLSX.utils.book_new();
       const ws_data = [['品名', '貨主', 'Size', '單價', '進貨數量']];
       const rows = document.querySelectorAll('#fruitTable tbody tr');
@@ -166,7 +195,6 @@
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
       XLSX.utils.book_append_sheet(wb, ws, '進貨清單');
       XLSX.writeFile(wb, `進貨記錄_${fileNameTime}.xlsx`);
-
       clearAll();
     }
 
@@ -185,7 +213,7 @@
     function selectFruit() {
       const selected = document.getElementById('fruitSelect').value;
       if (selected) {
-        document.getElementById('fruitName').value = selected;
+        document.getElementById('fruitName').value = '';
       }
     }
 
