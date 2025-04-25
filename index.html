@@ -6,45 +6,14 @@
   <title>水果計算機</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
-    body {
-      padding: 10px;
-      font-family: Arial, sans-serif;
-    }
-    input, button {
-      font-size: 1.1em;
-      padding: 8px;
-      margin: 5px 0;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    table, th, td {
-      border: 1px solid black;
-      border-collapse: collapse;
-      padding: 6px;
-    }
-    table {
-      margin-top: 20px;
-      width: 100%;
-      font-size: 0.95em;
-    }
-    button {
-      cursor: pointer;
-    }
-    .delete-btn {
-      background-color: #ff5c5c;
-      color: white;
-      border: none;
-    }
-    .edit-btn {
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-    }
-    @media (min-width: 600px) {
-      input, button {
-        width: auto;
-      }
-    }
+    body { padding: 10px; font-family: Arial, sans-serif; }
+    input, select, button { font-size: 1.1em; padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+    table, th, td { border: 1px solid black; border-collapse: collapse; padding: 6px; }
+    table { margin-top: 20px; width: 100%; font-size: 0.95em; }
+    button { cursor: pointer; }
+    .delete-btn { background-color: #ff5c5c; color: white; border: none; }
+    .edit-btn { background-color: #4CAF50; color: white; border: none; }
+    @media (min-width: 600px) { input, select, button { width: auto; } }
   </style>
 </head>
 <body>
@@ -53,6 +22,8 @@
 
   <label>水果品名：</label>
   <input type="text" id="fruitName" placeholder="例如：蘋果" />
+  <select id="fruitSelect" onchange="selectFruit()" style="margin-top:5px;"></select>
+  <button onclick="deleteFruitOption()">刪除選擇的水果品名</button><br><br>
 
   <label>數量：</label>
   <input type="number" id="fruitQty" placeholder="輸入數量" />
@@ -61,10 +32,10 @@
   <input type="number" id="fruitPrice" placeholder="輸入單價" />
 
   <button onclick="calcFruitAmount()">新增水果</button>
-  <button onclick="exportToExcel()">匯出資料</button>
+  <button onclick="exportToExcel()">匯出 Excel 並清空</button>
   <button onclick="clearAll()">全部清空</button><br><br>
 
-  <div id="fruitResult">此筆水果金額</div>
+  <div id="fruitResult">水果金額會顯示在這裡</div>
 
   <table id="fruitTable">
     <thead>
@@ -88,6 +59,7 @@
 
   <script>
     const STORAGE_KEY = 'fruitData';
+    const FRUIT_OPTIONS_KEY = 'fruitOptions';
 
     function updateTime() {
       const now = new Date();
@@ -97,18 +69,23 @@
     updateTime();
 
     function calcFruitAmount() {
-      const name = document.getElementById('fruitName').value;
+      const name = document.getElementById('fruitName').value.trim();
       const qty = parseFloat(document.getElementById('fruitQty').value);
       const price = parseFloat(document.getElementById('fruitPrice').value);
+
       if (!name || isNaN(qty) || isNaN(price)) {
         document.getElementById('fruitResult').innerText = '請完整輸入水果資訊';
         return;
       }
+
       const amount = qty * price;
       document.getElementById('fruitResult').innerText = `${name} 的總金額是：${amount} 元`;
+
       const data = { name, qty, price, amount };
       addRow(data);
       saveToLocalStorage();
+      addFruitOption(name);
+
       document.getElementById('fruitName').value = '';
       document.getElementById('fruitQty').value = '';
       document.getElementById('fruitPrice').value = '';
@@ -126,9 +103,7 @@
       const editBtn = document.createElement('button');
       editBtn.innerText = '編輯';
       editBtn.className = 'edit-btn';
-      editBtn.onclick = function () {
-        enableEdit(newRow, editBtn);
-      };
+      editBtn.onclick = function () { enableEdit(newRow, editBtn); };
 
       const deleteBtn = document.createElement('button');
       deleteBtn.innerText = '刪除';
@@ -150,19 +125,19 @@
       row.cells[2].innerHTML = `<input type="number" value="${row.cells[2].innerText}">`;
 
       editBtn.innerText = '儲存';
-      editBtn.onclick = function () {
-        saveEdit(row, editBtn);
-      };
+      editBtn.onclick = function () { saveEdit(row, editBtn); };
     }
 
     function saveEdit(row, editBtn) {
       const name = row.cells[0].querySelector('input').value;
       const qty = parseFloat(row.cells[1].querySelector('input').value);
       const price = parseFloat(row.cells[2].querySelector('input').value);
+
       if (!name || isNaN(qty) || isNaN(price)) {
         alert('請輸入正確資料');
         return;
       }
+
       const amount = qty * price;
       row.cells[0].innerText = name;
       row.cells[1].innerText = qty;
@@ -170,9 +145,7 @@
       row.cells[3].innerText = amount;
 
       editBtn.innerText = '編輯';
-      editBtn.onclick = function () {
-        enableEdit(row, editBtn);
-      };
+      editBtn.onclick = function () { enableEdit(row, editBtn); };
 
       updateTotal();
       saveToLocalStorage();
@@ -236,7 +209,54 @@
       clearAll();
     }
 
+    function addFruitOption(name) {
+      const select = document.getElementById('fruitSelect');
+      const options = Array.from(select.options).map(opt => opt.value);
+      if (!options.includes(name)) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.text = name;
+        select.appendChild(option);
+        saveFruitOptions();
+      }
+    }
+
+    function selectFruit() {
+      const selected = document.getElementById('fruitSelect').value;
+      if (selected) {
+        document.getElementById('fruitName').value = selected;
+      }
+    }
+
+    function deleteFruitOption() {
+      const select = document.getElementById('fruitSelect');
+      if (select.selectedIndex !== -1) {
+        select.remove(select.selectedIndex);
+        saveFruitOptions();
+      }
+    }
+
+    function saveFruitOptions() {
+      const select = document.getElementById('fruitSelect');
+      const fruits = Array.from(select.options).map(opt => opt.value);
+      localStorage.setItem(FRUIT_OPTIONS_KEY, JSON.stringify(fruits));
+    }
+
+    function loadFruitOptions() {
+      const saved = localStorage.getItem(FRUIT_OPTIONS_KEY);
+      if (!saved) return;
+      const fruits = JSON.parse(saved);
+      const select = document.getElementById('fruitSelect');
+      fruits.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.text = name;
+        select.appendChild(option);
+      });
+    }
+
     loadFromLocalStorage();
+    loadFruitOptions();
   </script>
 </body>
 </html>
