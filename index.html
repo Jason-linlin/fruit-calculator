@@ -45,7 +45,8 @@
   <input type="number" id="fruitPrice" placeholder="輸入單價"><br><br>
 
   <button onclick="calcFruitAmount()">新增水果</button>
-  <button onclick="exportToExcel()">匯出 Excel</button><br><br>
+  <button onclick="exportToExcel()">匯出 Excel 並清空</button>
+  <button onclick="clearAll()">全部清空</button><br><br>
 
   <div id="fruitResult">水果金額會顯示在這裡</div>
 
@@ -70,7 +71,8 @@
   </table>
 
   <script>
-    // 顯示目前時間
+    const STORAGE_KEY = 'fruitData';
+
     function updateTime() {
       const now = new Date();
       const timeString = now.toLocaleString();
@@ -92,13 +94,23 @@
       const amount = qty * price;
       document.getElementById('fruitResult').innerText = `${name} 的總金額是：${amount} 元`;
 
+      const data = { name, qty, price, amount };
+      addRow(data);
+      saveToLocalStorage();
+
+      document.getElementById('fruitName').value = '';
+      document.getElementById('fruitQty').value = '';
+      document.getElementById('fruitPrice').value = '';
+    }
+
+    function addRow(data) {
       const tableBody = document.querySelector('#fruitTable tbody');
       const newRow = tableBody.insertRow();
 
-      newRow.insertCell(0).innerText = name;
-      newRow.insertCell(1).innerText = qty;
-      newRow.insertCell(2).innerText = price;
-      newRow.insertCell(3).innerText = amount;
+      newRow.insertCell(0).innerText = data.name;
+      newRow.insertCell(1).innerText = data.qty;
+      newRow.insertCell(2).innerText = data.price;
+      newRow.insertCell(3).innerText = data.amount;
 
       const controlCell = newRow.insertCell(4);
       const editBtn = document.createElement('button');
@@ -113,16 +125,12 @@
       deleteBtn.className = 'delete-btn';
       deleteBtn.onclick = function () {
         tableBody.removeChild(newRow);
+        saveToLocalStorage();
         updateTotal();
       };
 
       controlCell.appendChild(editBtn);
       controlCell.appendChild(deleteBtn);
-
-      document.getElementById('fruitName').value = '';
-      document.getElementById('fruitQty').value = '';
-      document.getElementById('fruitPrice').value = '';
-
       updateTotal();
     }
 
@@ -159,6 +167,7 @@
       };
 
       updateTotal();
+      saveToLocalStorage();
     }
 
     function updateTotal() {
@@ -169,6 +178,29 @@
         total += isNaN(amount) ? 0 : amount;
       });
       document.getElementById('totalAmount').innerText = total.toFixed(2);
+    }
+
+    function saveToLocalStorage() {
+      const rows = document.querySelectorAll('#fruitTable tbody tr');
+      const data = Array.from(rows).map(row => ({
+        name: row.cells[0].innerText,
+        qty: row.cells[1].innerText,
+        price: row.cells[2].innerText,
+        amount: row.cells[3].innerText
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function loadFromLocalStorage() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      JSON.parse(saved).forEach(data => addRow(data));
+    }
+
+    function clearAll() {
+      document.querySelector('#fruitTable tbody').innerHTML = '';
+      updateTotal();
+      localStorage.removeItem(STORAGE_KEY);
     }
 
     function exportToExcel() {
@@ -193,9 +225,13 @@
 
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
       XLSX.utils.book_append_sheet(wb, ws, '水果清單');
-
       XLSX.writeFile(wb, `水果記錄_${fileNameTime}.xlsx`);
+
+      clearAll(); // 匯出後清空
     }
+
+    // 初始化：載入 LocalStorage 資料
+    loadFromLocalStorage();
   </script>
 </body>
 </html>
