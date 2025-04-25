@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>水果計算機</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      padding: 6px;
+    }
+    table {
+      margin-top: 20px;
+      width: 100%;
+    }
+    button {
+      padding: 4px 8px;
+      margin: 2px;
+      cursor: pointer;
+    }
+    .delete-btn {
+      background-color: #ff5c5c;
+      color: white;
+      border: none;
+    }
+    .edit-btn {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>水果金額計算</h2>
+  <div id="currentTime" style="font-weight: bold;">現在時間：--:--:--</div><br>
+
+  <label>水果品名：</label>
+  <input type="text" id="fruitName" placeholder="例如：蘋果"><br><br>
+
+  <label>數量：</label>
+  <input type="number" id="fruitQty" placeholder="輸入數量"><br><br>
+
+  <label>單價：</label>
+  <input type="number" id="fruitPrice" placeholder="輸入單價"><br><br>
+
+  <button onclick="calcFruitAmount()">新增水果</button>
+  <button onclick="exportToExcel()">匯出 Excel</button><br><br>
+
+  <div id="fruitResult">水果金額會顯示在這裡</div>
+
+  <table id="fruitTable">
+    <thead>
+      <tr>
+        <th>水果品名</th>
+        <th>數量</th>
+        <th>單價</th>
+        <th>金額</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3" style="text-align:right;"><strong>總金額：</strong></td>
+        <td id="totalAmount"><strong>0</strong></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <script>
+    // 顯示目前時間
+    function updateTime() {
+      const now = new Date();
+      const timeString = now.toLocaleString();
+      document.getElementById('currentTime').innerText = '現在時間：' + timeString;
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    function calcFruitAmount() {
+      const name = document.getElementById('fruitName').value;
+      const qty = parseFloat(document.getElementById('fruitQty').value);
+      const price = parseFloat(document.getElementById('fruitPrice').value);
+
+      if (!name || isNaN(qty) || isNaN(price)) {
+        document.getElementById('fruitResult').innerText = '請完整輸入水果資訊';
+        return;
+      }
+
+      const amount = qty * price;
+      document.getElementById('fruitResult').innerText = `${name} 的總金額是：${amount} 元`;
+
+      const tableBody = document.querySelector('#fruitTable tbody');
+      const newRow = tableBody.insertRow();
+
+      newRow.insertCell(0).innerText = name;
+      newRow.insertCell(1).innerText = qty;
+      newRow.insertCell(2).innerText = price;
+      newRow.insertCell(3).innerText = amount;
+
+      const controlCell = newRow.insertCell(4);
+      const editBtn = document.createElement('button');
+      editBtn.innerText = '編輯';
+      editBtn.className = 'edit-btn';
+      editBtn.onclick = function () {
+        enableEdit(newRow, editBtn);
+      };
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.innerText = '刪除';
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.onclick = function () {
+        tableBody.removeChild(newRow);
+        updateTotal();
+      };
+
+      controlCell.appendChild(editBtn);
+      controlCell.appendChild(deleteBtn);
+
+      document.getElementById('fruitName').value = '';
+      document.getElementById('fruitQty').value = '';
+      document.getElementById('fruitPrice').value = '';
+
+      updateTotal();
+    }
+
+    function enableEdit(row, editBtn) {
+      row.cells[0].innerHTML = `<input type="text" value="${row.cells[0].innerText}">`;
+      row.cells[1].innerHTML = `<input type="number" value="${row.cells[1].innerText}">`;
+      row.cells[2].innerHTML = `<input type="number" value="${row.cells[2].innerText}">`;
+
+      editBtn.innerText = '儲存';
+      editBtn.onclick = function () {
+        saveEdit(row, editBtn);
+      };
+    }
+
+    function saveEdit(row, editBtn) {
+      const name = row.cells[0].querySelector('input').value;
+      const qty = parseFloat(row.cells[1].querySelector('input').value);
+      const price = parseFloat(row.cells[2].querySelector('input').value);
+
+      if (!name || isNaN(qty) || isNaN(price)) {
+        alert('請輸入正確資料');
+        return;
+      }
+
+      const amount = qty * price;
+      row.cells[0].innerText = name;
+      row.cells[1].innerText = qty;
+      row.cells[2].innerText = price;
+      row.cells[3].innerText = amount;
+
+      editBtn.innerText = '編輯';
+      editBtn.onclick = function () {
+        enableEdit(row, editBtn);
+      };
+
+      updateTotal();
+    }
+
+    function updateTotal() {
+      const rows = document.querySelectorAll('#fruitTable tbody tr');
+      let total = 0;
+      rows.forEach(row => {
+        const amount = parseFloat(row.cells[3].innerText);
+        total += isNaN(amount) ? 0 : amount;
+      });
+      document.getElementById('totalAmount').innerText = total.toFixed(2);
+    }
+
+    function exportToExcel() {
+      const now = new Date();
+      const timeStr = now.toLocaleString();
+      const fileNameTime = now.toISOString().replace(/[:.]/g, '-');
+
+      const wb = XLSX.utils.book_new();
+      const ws_data = [['水果品名', '數量', '單價', '金額']];
+      const rows = document.querySelectorAll('#fruitTable tbody tr');
+
+      rows.forEach(row => {
+        const name = row.cells[0].innerText;
+        const qty = row.cells[1].innerText;
+        const price = row.cells[2].innerText;
+        const amount = row.cells[3].innerText;
+        ws_data.push([name, qty, price, amount]);
+      });
+
+      ws_data.push(['', '', '總金額', document.getElementById('totalAmount').innerText]);
+      ws_data.push(['匯出時間：' + timeStr]);
+
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      XLSX.utils.book_append_sheet(wb, ws, '水果清單');
+
+      XLSX.writeFile(wb, `水果記錄_${fileNameTime}.xlsx`);
+    }
+  </script>
+</body>
+</html>
