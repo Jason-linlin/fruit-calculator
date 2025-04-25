@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>水果計算機</title>
+  <title>水果進貨管理</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     body { padding: 10px; font-family: Arial, sans-serif; }
@@ -17,44 +17,44 @@
   </style>
 </head>
 <body>
-  <h2>水果金額計算</h2>
+  <h2>水果進貨管理</h2>
   <div id="currentTime" style="font-weight: bold;">現在時間：--:--:--</div><br>
 
-  <label>水果品名：</label>
-  <input type="text" id="fruitName" placeholder="例如：蘋果" />
+  <label>品名：</label>
+  <input type="text" id="fruitName" placeholder="輸入品名" />
   <select id="fruitSelect" onchange="selectFruit()" style="margin-top:5px;"></select>
-  <button onclick="deleteFruitOption()">刪除選擇的水果品名</button><br><br>
+  <button onclick="deleteFruitOption()">刪除選擇的品名</button><br><br>
 
-  <label>數量：</label>
-  <input type="number" id="fruitQty" placeholder="輸入數量" />
+  <label>貨主：</label>
+  <input type="text" id="owner" placeholder="輸入貨主" />
+
+  <label>Size：</label>
+  <input type="text" id="size" placeholder="輸入Size" />
 
   <label>單價：</label>
-  <input type="number" id="fruitPrice" placeholder="輸入單價" />
+  <input type="number" id="price" placeholder="輸入單價" />
 
-  <button onclick="calcFruitAmount()">新增水果</button>
+  <label>進貨數量：</label>
+  <input type="number" id="quantity" placeholder="輸入進貨數量" />
+
+  <button onclick="addEntry()">新增進貨資料</button>
   <button onclick="exportToExcel()">匯出 Excel 並清空</button>
   <button onclick="clearAll()">全部清空</button><br><br>
 
-  <div id="fruitResult">水果金額會顯示在這裡</div>
+  <div id="fruitResult">今天進貨總數量：<span id="totalQuantity">0</span></div>
 
   <table id="fruitTable">
     <thead>
       <tr>
-        <th>水果品名</th>
-        <th>數量</th>
+        <th>品名</th>
+        <th>貨主</th>
+        <th>Size</th>
         <th>單價</th>
-        <th>金額</th>
+        <th>進貨數量</th>
         <th>操作</th>
       </tr>
     </thead>
     <tbody></tbody>
-    <tfoot>
-      <tr>
-        <td colspan="3" style="text-align:right;"><strong>總金額：</strong></td>
-        <td id="totalAmount"><strong>0</strong></td>
-        <td></td>
-      </tr>
-    </tfoot>
   </table>
 
   <script>
@@ -68,106 +68,70 @@
     setInterval(updateTime, 1000);
     updateTime();
 
-    function calcFruitAmount() {
+    function addEntry() {
       const name = document.getElementById('fruitName').value.trim();
-      const qty = parseFloat(document.getElementById('fruitQty').value);
-      const price = parseFloat(document.getElementById('fruitPrice').value);
+      const owner = document.getElementById('owner').value.trim();
+      const size = document.getElementById('size').value.trim();
+      const price = document.getElementById('price').value.trim();
+      const quantity = parseInt(document.getElementById('quantity').value.trim());
 
-      if (!name || isNaN(qty) || isNaN(price)) {
-        document.getElementById('fruitResult').innerText = '請完整輸入水果資訊';
+      if (!name || !owner || !size || isNaN(price) || isNaN(quantity)) {
+        alert('請完整輸入所有資訊');
         return;
       }
 
-      const amount = qty * price;
-      document.getElementById('fruitResult').innerText = `${name} 的總金額是：${amount} 元`;
-
-      const data = { name, qty, price, amount };
+      const data = { name, owner, size, price, quantity };
       addRow(data);
       saveToLocalStorage();
       addFruitOption(name);
 
       document.getElementById('fruitName').value = '';
-      document.getElementById('fruitQty').value = '';
-      document.getElementById('fruitPrice').value = '';
+      document.getElementById('owner').value = '';
+      document.getElementById('size').value = '';
+      document.getElementById('price').value = '';
+      document.getElementById('quantity').value = '';
     }
 
     function addRow(data) {
       const tableBody = document.querySelector('#fruitTable tbody');
       const newRow = tableBody.insertRow();
       newRow.insertCell(0).innerText = data.name;
-      newRow.insertCell(1).innerText = data.qty;
-      newRow.insertCell(2).innerText = data.price;
-      newRow.insertCell(3).innerText = data.amount;
+      newRow.insertCell(1).innerText = data.owner;
+      newRow.insertCell(2).innerText = data.size;
+      newRow.insertCell(3).innerText = data.price;
+      newRow.insertCell(4).innerText = data.quantity;
 
-      const controlCell = newRow.insertCell(4);
-      const editBtn = document.createElement('button');
-      editBtn.innerText = '編輯';
-      editBtn.className = 'edit-btn';
-      editBtn.onclick = function () { enableEdit(newRow, editBtn); };
-
+      const controlCell = newRow.insertCell(5);
       const deleteBtn = document.createElement('button');
       deleteBtn.innerText = '刪除';
       deleteBtn.className = 'delete-btn';
       deleteBtn.onclick = function () {
         tableBody.removeChild(newRow);
         saveToLocalStorage();
-        updateTotal();
+        updateTotalQuantity();
       };
-
-      controlCell.appendChild(editBtn);
       controlCell.appendChild(deleteBtn);
-      updateTotal();
+      updateTotalQuantity();
     }
 
-    function enableEdit(row, editBtn) {
-      row.cells[0].innerHTML = `<input type="text" value="${row.cells[0].innerText}">`;
-      row.cells[1].innerHTML = `<input type="number" value="${row.cells[1].innerText}">`;
-      row.cells[2].innerHTML = `<input type="number" value="${row.cells[2].innerText}">`;
-
-      editBtn.innerText = '儲存';
-      editBtn.onclick = function () { saveEdit(row, editBtn); };
-    }
-
-    function saveEdit(row, editBtn) {
-      const name = row.cells[0].querySelector('input').value;
-      const qty = parseFloat(row.cells[1].querySelector('input').value);
-      const price = parseFloat(row.cells[2].querySelector('input').value);
-
-      if (!name || isNaN(qty) || isNaN(price)) {
-        alert('請輸入正確資料');
-        return;
-      }
-
-      const amount = qty * price;
-      row.cells[0].innerText = name;
-      row.cells[1].innerText = qty;
-      row.cells[2].innerText = price;
-      row.cells[3].innerText = amount;
-
-      editBtn.innerText = '編輯';
-      editBtn.onclick = function () { enableEdit(row, editBtn); };
-
-      updateTotal();
-      saveToLocalStorage();
-    }
-
-    function updateTotal() {
+    function updateTotalQuantity() {
       const rows = document.querySelectorAll('#fruitTable tbody tr');
       let total = 0;
       rows.forEach(row => {
-        const amount = parseFloat(row.cells[3].innerText);
-        total += isNaN(amount) ? 0 : amount;
+        const qty = parseInt(row.cells[4].innerText);
+        total += isNaN(qty) ? 0 : qty;
       });
-      document.getElementById('totalAmount').innerText = total.toFixed(2);
+      document.getElementById('totalQuantity').innerText = total;
     }
 
     function saveToLocalStorage() {
       const rows = document.querySelectorAll('#fruitTable tbody tr');
       const data = Array.from(rows).map(row => ({
         name: row.cells[0].innerText,
-        qty: row.cells[1].innerText,
-        price: row.cells[2].innerText,
-        amount: row.cells[3].innerText
+        owner: row.cells[1].innerText,
+        size: row.cells[2].innerText,
+        price: row.cells[3].innerText,
+        quantity: row.cells[4].innerText
       }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
@@ -180,31 +144,28 @@
 
     function clearAll() {
       document.querySelector('#fruitTable tbody').innerHTML = '';
-      updateTotal();
+      updateTotalQuantity();
       localStorage.removeItem(STORAGE_KEY);
     }
 
     function exportToExcel() {
       const now = new Date();
-      const timeStr = now.toLocaleString();
       const fileNameTime = now.toISOString().replace(/[:.]/g, '-');
 
       const wb = XLSX.utils.book_new();
-      const ws_data = [['水果品名', '數量', '單價', '金額']];
+      const ws_data = [['品名', '貨主', 'Size', '單價', '進貨數量']];
       const rows = document.querySelectorAll('#fruitTable tbody tr');
       rows.forEach(row => {
         const name = row.cells[0].innerText;
-        const qty = row.cells[1].innerText;
-        const price = row.cells[2].innerText;
-        const amount = row.cells[3].innerText;
-        ws_data.push([name, qty, price, amount]);
+        const owner = row.cells[1].innerText;
+        const size = row.cells[2].innerText;
+        const price = row.cells[3].innerText;
+        const quantity = row.cells[4].innerText;
+        ws_data.push([name, owner, size, price, quantity]);
       });
-      ws_data.push(['', '', '總金額', document.getElementById('totalAmount').innerText]);
-      ws_data.push(['匯出時間：' + timeStr]);
-
       const ws = XLSX.utils.aoa_to_sheet(ws_data);
-      XLSX.utils.book_append_sheet(wb, ws, '水果清單');
-      XLSX.writeFile(wb, `水果記錄_${fileNameTime}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, '進貨清單');
+      XLSX.writeFile(wb, `進貨記錄_${fileNameTime}.xlsx`);
 
       clearAll();
     }
@@ -239,11 +200,11 @@
     function saveFruitOptions() {
       const select = document.getElementById('fruitSelect');
       const fruits = Array.from(select.options).map(opt => opt.value);
-      localStorage.setItem(FRUIT_OPTIONS_KEY, JSON.stringify(fruits));
+      localStorage.setItem('fruitOptions', JSON.stringify(fruits));
     }
 
     function loadFruitOptions() {
-      const saved = localStorage.getItem(FRUIT_OPTIONS_KEY);
+      const saved = localStorage.getItem('fruitOptions');
       if (!saved) return;
       const fruits = JSON.parse(saved);
       const select = document.getElementById('fruitSelect');
