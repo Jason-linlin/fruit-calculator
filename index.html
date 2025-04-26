@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>水果進貨管理</title>
+  <title>進貨與銷售管理系統</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     body { padding: 10px; font-family: Arial, sans-serif; }
@@ -11,14 +11,26 @@
     table, th, td { border: 1px solid black; border-collapse: collapse; padding: 6px; }
     table { margin-top: 20px; width: 100%; font-size: 0.95em; }
     button { cursor: pointer; }
+    .tab-btn { width: 48%; margin-right: 2%; }
+    .tab-btn:last-child { margin-right: 0; }
+    .tab-content { display: none; }
+    .tab-active { display: block; }
     .delete-btn { background-color: #ff5c5c; color: white; border: none; }
     .edit-btn { background-color: #4CAF50; color: white; border: none; }
     @media (min-width: 600px) { input, select, button { width: auto; } }
   </style>
 </head>
 <body>
-  <h2>水果進貨管理</h2>
-  <div id="currentTime" style="font-weight: bold;">現在時間：--:--:--</div><br>
+
+<h2>進貨與銷售管理系統</h2>
+<div id="currentTime" style="font-weight: bold;">現在時間：--:--:--</div><br>
+
+<button class="tab-btn" onclick="switchTab('purchaseTab')">進貨管理</button>
+<button class="tab-btn" onclick="switchTab('salesTab')">銷售管理</button>
+
+<!-- 進貨管理分頁 -->
+<div id="purchaseTab" class="tab-content tab-active">
+  <h3>進貨管理</h3>
 
   <label>品名：</label>
   <input type="text" id="fruitName" placeholder="輸入品名">
@@ -41,7 +53,7 @@
   <button onclick="exportToExcel()">匯出 Excel 並清空</button>
   <button onclick="clearAll()">全部清空</button><br><br>
 
-  <div id="fruitResult">今天進貨總數量：<span id="totalQuantity">0</span></div>
+  <div>今天進貨總數量：<span id="totalQuantity">0</span></div>
 
   <table id="fruitTable">
     <thead>
@@ -56,196 +68,315 @@
     </thead>
     <tbody></tbody>
   </table>
+</div>
 
-  <script>
-    const STORAGE_KEY = 'fruitData';
-    const FRUIT_OPTIONS_KEY = 'fruitOptions';
+<!-- 銷售管理分頁 -->
+<div id="salesTab" class="tab-content">
+  <h3>銷售管理</h3>
 
-    function updateTime() {
-      const now = new Date();
-      document.getElementById('currentTime').innerText = '現在時間：' + now.toLocaleString();
+  <label>品名（從庫存選擇）：</label>
+  <select id="salesSelect"></select><br><br>
+
+  <label>銷售單價：</label>
+  <input type="number" inputmode="numeric" id="salesPrice" placeholder="輸入銷售單價" />
+
+  <label>銷售數量：</label>
+  <input type="number" inputmode="numeric" id="salesQuantity" placeholder="輸入銷售數量" />
+
+  <button onclick="addSales()">新增銷售紀錄</button><br><br>
+
+  <div>目前庫存狀態：</div>
+  <div id="inventoryStatus"></div>
+
+  <table id="salesTable">
+    <thead>
+      <tr>
+        <th>品名</th>
+        <th>單價</th>
+        <th>銷售數量</th>
+        <th>銷售總金額</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const STORAGE_KEY = 'fruitData';
+const SALES_KEY = 'salesData';
+const FRUIT_OPTIONS_KEY = 'fruitOptions';
+
+function updateTime() {
+  const now = new Date();
+  document.getElementById('currentTime').innerText = '現在時間：' + now.toLocaleString();
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('tab-active'));
+  document.getElementById(tabId).classList.add('tab-active');
+}
+
+function addEntry() {
+  const select = document.getElementById('fruitSelect');
+  const selectedFruit = select.value;
+  const inputFruit = document.getElementById('fruitName').value.trim();
+  const name = selectedFruit ? selectedFruit : inputFruit;
+
+  const owner = document.getElementById('owner').value.trim();
+  const size = document.getElementById('size').value.trim();
+  const price = document.getElementById('price').value.trim();
+  const quantity = parseInt(document.getElementById('quantity').value.trim());
+
+  if (!name || !owner || !size || isNaN(price) || isNaN(quantity)) {
+    alert('請完整輸入所有資訊');
+    return;
+  }
+
+  const data = { name, owner, size, price, quantity };
+  addRow(data);
+  saveToLocalStorage();
+  addFruitOption(name);
+
+  document.getElementById('fruitName').value = '';
+  document.getElementById('owner').value = '';
+  document.getElementById('size').value = '';
+  document.getElementById('price').value = '';
+  document.getElementById('quantity').value = '';
+  document.getElementById('fruitSelect').selectedIndex = 0;
+
+  updateSalesSelect();
+}
+
+function addRow(data) {
+  const tableBody = document.querySelector('#fruitTable tbody');
+  const newRow = tableBody.insertRow();
+  newRow.insertCell(0).innerText = data.name;
+  newRow.insertCell(1).innerText = data.owner;
+  newRow.insertCell(2).innerText = data.size;
+  newRow.insertCell(3).innerText = data.price;
+  newRow.insertCell(4).innerText = data.quantity;
+
+  const controlCell = newRow.insertCell(5);
+  const deleteBtn = document.createElement('button');
+  deleteBtn.innerText = '刪除';
+  deleteBtn.className = 'delete-btn';
+  deleteBtn.onclick = function () {
+    tableBody.removeChild(newRow);
+    saveToLocalStorage();
+    updateTotalQuantity();
+    updateSalesSelect();
+  };
+  controlCell.appendChild(deleteBtn);
+
+  updateTotalQuantity();
+}
+
+function updateTotalQuantity() {
+  const rows = document.querySelectorAll('#fruitTable tbody tr');
+  let total = 0;
+  rows.forEach(row => {
+    const qty = parseInt(row.cells[4].innerText);
+    total += isNaN(qty) ? 0 : qty;
+  });
+  document.getElementById('totalQuantity').innerText = total;
+}
+
+function saveToLocalStorage() {
+  const rows = document.querySelectorAll('#fruitTable tbody tr');
+  const data = Array.from(rows).map(row => ({
+    name: row.cells[0].innerText,
+    owner: row.cells[1].innerText,
+    size: row.cells[2].innerText,
+    price: row.cells[3].innerText,
+    quantity: parseInt(row.cells[4].innerText)
+  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadFromLocalStorage() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return;
+  JSON.parse(saved).forEach(data => addRow(data));
+}
+
+function clearAll() {
+  document.querySelector('#fruitTable tbody').innerHTML = '';
+  updateTotalQuantity();
+  localStorage.removeItem(STORAGE_KEY);
+  updateSalesSelect();
+}
+
+function exportToExcel() {
+  const now = new Date();
+  const fileNameTime = now.toISOString().replace(/[:.]/g, '-');
+  const wb = XLSX.utils.book_new();
+  const ws_data = [['品名', '貨主', 'Size', '單價', '進貨數量']];
+  const rows = document.querySelectorAll('#fruitTable tbody tr');
+  rows.forEach(row => {
+    ws_data.push([
+      row.cells[0].innerText,
+      row.cells[1].innerText,
+      row.cells[2].innerText,
+      row.cells[3].innerText,
+      row.cells[4].innerText
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  XLSX.utils.book_append_sheet(wb, ws, '進貨清單');
+  XLSX.writeFile(wb, `進貨記錄_${fileNameTime}.xlsx`);
+  clearAll();
+}
+
+function addFruitOption(name) {
+  const select = document.getElementById('fruitSelect');
+  const options = Array.from(select.options).map(opt => opt.value);
+  if (!options.includes(name)) {
+    const option = document.createElement('option');
+    option.value = name;
+    option.text = name;
+    select.appendChild(option);
+    saveFruitOptions();
+  }
+}
+
+function selectFruit() {
+  const selected = document.getElementById('fruitSelect').value;
+  if (selected) {
+    document.getElementById('fruitName').value = '';
+  }
+}
+
+function deleteFruitOption() {
+  const select = document.getElementById('fruitSelect');
+  if (select.selectedIndex !== -1) {
+    select.remove(select.selectedIndex);
+    saveFruitOptions();
+  }
+}
+
+function saveFruitOptions() {
+  const select = document.getElementById('fruitSelect');
+  const fruits = Array.from(select.options).map(opt => opt.value);
+  localStorage.setItem(FRUIT_OPTIONS_KEY, JSON.stringify(fruits));
+}
+
+function loadFruitOptions() {
+  const saved = localStorage.getItem(FRUIT_OPTIONS_KEY);
+  if (!saved) return;
+  const fruits = JSON.parse(saved);
+  const select = document.getElementById('fruitSelect');
+  fruits.forEach(name => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.text = name;
+    select.appendChild(option);
+  });
+}
+
+function updateSalesSelect() {
+  const inventory = calculateInventory();
+  const salesSelect = document.getElementById('salesSelect');
+  salesSelect.innerHTML = '';
+  for (const name in inventory) {
+    if (inventory[name] > 0) {
+      const option = document.createElement('option');
+      option.value = name;
+      option.text = `${name} (剩餘${inventory[name]})`;
+      salesSelect.appendChild(option);
     }
-    setInterval(updateTime, 1000);
-    updateTime();
+  }
+  updateInventoryStatus();
+}
 
-    function addEntry() {
-      const select = document.getElementById('fruitSelect');
-      const selectedFruit = select.value;
-      const inputFruit = document.getElementById('fruitName').value.trim();
-      const name = selectedFruit ? selectedFruit : inputFruit;
+function addSales() {
+  const selectedFruit = document.getElementById('salesSelect').value;
+  const salesPrice = parseFloat(document.getElementById('salesPrice').value);
+  const salesQty = parseInt(document.getElementById('salesQuantity').value);
 
-      const owner = document.getElementById('owner').value.trim();
-      const size = document.getElementById('size').value.trim();
-      const price = document.getElementById('price').value.trim();
-      const quantity = parseInt(document.getElementById('quantity').value.trim());
+  if (!selectedFruit || isNaN(salesPrice) || isNaN(salesQty)) {
+    alert('請完整輸入銷售資訊');
+    return;
+  }
 
-      if (!name || !owner || !size || isNaN(price) || isNaN(quantity)) {
-        alert('請完整輸入所有資訊');
-        return;
-      }
+  const inventory = calculateInventory();
+  if (inventory[selectedFruit] < salesQty) {
+    alert('庫存不足，無法銷售！');
+    return;
+  }
 
-      const data = { name, owner, size, price, quantity };
-      addRow(data);
-      saveToLocalStorage();
-      addFruitOption(name);
+  const tableBody = document.querySelector('#salesTable tbody');
+  const newRow = tableBody.insertRow();
+  newRow.insertCell(0).innerText = selectedFruit;
+  newRow.insertCell(1).innerText = salesPrice.toFixed(2);
+  newRow.insertCell(2).innerText = salesQty;
+  newRow.insertCell(3).innerText = (salesPrice * salesQty).toFixed(2);
 
-      document.getElementById('fruitName').value = '';
-      document.getElementById('owner').value = '';
-      document.getElementById('size').value = '';
-      document.getElementById('price').value = '';
-      document.getElementById('quantity').value = '';
-      document.getElementById('fruitSelect').selectedIndex = 0;
-    }
+  saveSalesToLocal();
+  updateInventoryStatus();
+  updateSalesSelect();
 
-    function addRow(data) {
-      const tableBody = document.querySelector('#fruitTable tbody');
-      const newRow = tableBody.insertRow();
-      newRow.insertCell(0).innerText = data.name;
-      newRow.insertCell(1).innerText = data.owner;
-      newRow.insertCell(2).innerText = data.size;
-      newRow.insertCell(3).innerText = data.price;
-      newRow.insertCell(4).innerText = data.quantity;
+  document.getElementById('salesPrice').value = '';
+  document.getElementById('salesQuantity').value = '';
+}
 
-      const controlCell = newRow.insertCell(5);
-      const editBtn = document.createElement('button');
-      editBtn.innerText = '編輯';
-      editBtn.className = 'edit-btn';
-      editBtn.onclick = function () { enableEdit(newRow, editBtn); };
+function calculateInventory() {
+  const savedPurchase = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const savedSales = JSON.parse(localStorage.getItem(SALES_KEY) || '[]');
+  const inventory = {};
 
-      const deleteBtn = document.createElement('button');
-      deleteBtn.innerText = '刪除';
-      deleteBtn.className = 'delete-btn';
-      deleteBtn.onclick = function () {
-        tableBody.removeChild(newRow);
-        saveToLocalStorage();
-        updateTotalQuantity();
-      };
+  savedPurchase.forEach(item => {
+    inventory[item.name] = (inventory[item.name] || 0) + item.quantity;
+  });
 
-      controlCell.appendChild(editBtn);
-      controlCell.appendChild(deleteBtn);
-      updateTotalQuantity();
-    }
+  savedSales.forEach(item => {
+    inventory[item.name] = (inventory[item.name] || 0) - item.salesQty;
+  });
 
-    function enableEdit(row, editBtn) {
-      for (let i = 0; i <= 4; i++) {
-        row.cells[i].innerHTML = `<input type="text" value="${row.cells[i].innerText}">`;
-      }
-      editBtn.innerText = '儲存';
-      editBtn.onclick = function () { saveEdit(row, editBtn); };
-    }
+  return inventory;
+}
 
-    function saveEdit(row, editBtn) {
-      for (let i = 0; i <= 4; i++) {
-        row.cells[i].innerText = row.cells[i].querySelector('input').value;
-      }
-      editBtn.innerText = '編輯';
-      editBtn.onclick = function () { enableEdit(row, editBtn); };
-      updateTotalQuantity();
-      saveToLocalStorage();
-    }
+function updateInventoryStatus() {
+  const inventory = calculateInventory();
+  const inventoryDiv = document.getElementById('inventoryStatus');
+  inventoryDiv.innerHTML = '';
+  for (const name in inventory) {
+    inventoryDiv.innerHTML += `${name}：剩餘 ${inventory[name]}<br>`;
+  }
+}
 
-    function updateTotalQuantity() {
-      const rows = document.querySelectorAll('#fruitTable tbody tr');
-      let total = 0;
-      rows.forEach(row => {
-        const qty = parseInt(row.cells[4].innerText);
-        total += isNaN(qty) ? 0 : qty;
-      });
-      document.getElementById('totalQuantity').innerText = total;
-    }
+function saveSalesToLocal() {
+  const rows = document.querySelectorAll('#salesTable tbody tr');
+  const salesData = Array.from(rows).map(row => ({
+    name: row.cells[0].innerText,
+    salesPrice: parseFloat(row.cells[1].innerText),
+    salesQty: parseInt(row.cells[2].innerText),
+    salesTotal: parseFloat(row.cells[3].innerText)
+  }));
+  localStorage.setItem(SALES_KEY, JSON.stringify(salesData));
+}
 
-    function saveToLocalStorage() {
-      const rows = document.querySelectorAll('#fruitTable tbody tr');
-      const data = Array.from(rows).map(row => ({
-        name: row.cells[0].innerText,
-        owner: row.cells[1].innerText,
-        size: row.cells[2].innerText,
-        price: row.cells[3].innerText,
-        quantity: row.cells[4].innerText
-      }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    }
+function loadSalesFromLocal() {
+  const saved = localStorage.getItem(SALES_KEY);
+  if (!saved) return;
+  const sales = JSON.parse(saved);
+  const tableBody = document.querySelector('#salesTable tbody');
+  sales.forEach(data => {
+    const newRow = tableBody.insertRow();
+    newRow.insertCell(0).innerText = data.name;
+    newRow.insertCell(1).innerText = data.salesPrice.toFixed(2);
+    newRow.insertCell(2).innerText = data.salesQty;
+    newRow.insertCell(3).innerText = data.salesTotal.toFixed(2);
+  });
+}
 
-    function loadFromLocalStorage() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-      JSON.parse(saved).forEach(data => addRow(data));
-    }
+loadFromLocalStorage();
+loadFruitOptions();
+loadSalesFromLocal();
+updateSalesSelect();
+updateInventoryStatus();
+</script>
 
-    function clearAll() {
-      document.querySelector('#fruitTable tbody').innerHTML = '';
-      updateTotalQuantity();
-      localStorage.removeItem(STORAGE_KEY);
-    }
-
-    function exportToExcel() {
-      const now = new Date();
-      const fileNameTime = now.toISOString().replace(/[:.]/g, '-');
-      const wb = XLSX.utils.book_new();
-      const ws_data = [['品名', '貨主', 'Size', '單價', '進貨數量']];
-      const rows = document.querySelectorAll('#fruitTable tbody tr');
-      rows.forEach(row => {
-        const name = row.cells[0].innerText;
-        const owner = row.cells[1].innerText;
-        const size = row.cells[2].innerText;
-        const price = row.cells[3].innerText;
-        const quantity = row.cells[4].innerText;
-        ws_data.push([name, owner, size, price, quantity]);
-      });
-      const ws = XLSX.utils.aoa_to_sheet(ws_data);
-      XLSX.utils.book_append_sheet(wb, ws, '進貨清單');
-      XLSX.writeFile(wb, `進貨記錄_${fileNameTime}.xlsx`);
-      clearAll();
-    }
-
-    function addFruitOption(name) {
-      const select = document.getElementById('fruitSelect');
-      const options = Array.from(select.options).map(opt => opt.value);
-      if (!options.includes(name)) {
-        const option = document.createElement('option');
-        option.value = name;
-        option.text = name;
-        select.appendChild(option);
-        saveFruitOptions();
-      }
-    }
-
-    function selectFruit() {
-      const selected = document.getElementById('fruitSelect').value;
-      if (selected) {
-        document.getElementById('fruitName').value = '';
-      }
-    }
-
-    function deleteFruitOption() {
-      const select = document.getElementById('fruitSelect');
-      if (select.selectedIndex !== -1) {
-        select.remove(select.selectedIndex);
-        saveFruitOptions();
-      }
-    }
-
-    function saveFruitOptions() {
-      const select = document.getElementById('fruitSelect');
-      const fruits = Array.from(select.options).map(opt => opt.value);
-      localStorage.setItem('fruitOptions', JSON.stringify(fruits));
-    }
-
-    function loadFruitOptions() {
-      const saved = localStorage.getItem('fruitOptions');
-      if (!saved) return;
-      const fruits = JSON.parse(saved);
-      const select = document.getElementById('fruitSelect');
-      fruits.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.text = name;
-        select.appendChild(option);
-      });
-    }
-
-    loadFromLocalStorage();
-    loadFruitOptions();
-  </script>
 </body>
 </html>
