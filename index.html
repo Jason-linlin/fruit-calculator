@@ -6,10 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>進出貨管理（純前端 / IndexedDB）</title>
 
-  <!-- 匯出 Excel：SheetJS -->
-  https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js</script>
-  <!-- Dexie（非模組 UMD 版本，Global: window.Dexie）-->
-  https://cdn.jsdelivr.net/npm/dexie@4.0.4/dist/dexie.min.js</script>
+  <!-- 不依賴外網：改用本地檔 -->
+  <script src="./vendor/xlsx.fullpt>
+  ./vendor/dexie.min.js</script>
 
   <style>
     :root { --primary:#2b5cff; --danger:#ff5c5c; --ok:#4caf50; --bg:#f7f8fa; }
@@ -26,10 +25,7 @@
     input, select, button { width:100%; padding:10px; margin-top:6px; font-size:16px; border:1px solid #ddd; border-radius:8px; outline:none; }
     input:focus, select:focus { border-color:var(--primary); box-shadow:0 0 0 2px rgba(43,92,255,.15); }
     .row { display:grid; grid-template-columns:1fr; gap:12px; }
-    @media (min-width:760px) {
-      .row-2 { grid-template-columns:1fr 1fr; }
-      .row-3 { grid-template-columns:1fr 1fr 1fr; }
-    }
+    @media (min-width:760px) { .row-2 { grid-template-columns:1fr 1fr; } .row-3 { grid-template-columns:1fr 1fr 1fr; } }
     .btn { cursor:pointer; border:none; }
     .btn-primary { background:var(--primary); color:#fff; }
     .btn-danger { background:var(--danger); color:#fff; }
@@ -45,9 +41,7 @@
     .error { margin:12px 0; color:#b00020; background:#ffeef0; border:1px solid #ffcdd2; padding:8px; border-radius:8px; display:none; white-space:pre-wrap; }
   </style>
 
-  <noscript>
-    <div class="error">此應用程式需要啟用 JavaScript 才能運作。</div>
-  </noscript>
+  <noscript><div class="error">此應用程式需要啟用 JavaScript 才能運作。</div></noscript>
 </head>
 <body>
   <h2>進出貨管理</h2>
@@ -68,36 +62,17 @@
         <input id="in_name" list="nameList" placeholder="輸入品名或選擇" autocomplete="off" />
         <datalist id="nameList"></datalist>
       </div>
-      <div>
-        <label>貨主</label>
-        <input id="in_owner" placeholder="輸入貨主" />
-      </div>
-      <div>
-        <label>Size</label>
-        <input id="in_size" placeholder="輸入 Size" />
-      </div>
+      <div><label>貨主</label><input id="in_owner" placeholder="輸入貨主" /></div>
+      <div><label>Size</label><input id="in_size" placeholder="輸入 Size" /></div>
     </div>
-
     <div class="row row-3">
-      <div>
-        <label>單價</label>
-        <input id="in_price" type="number" inputmode="decimal" placeholder="輸入單價" />
-      </div>
-      <div>
-        <label>進貨數量</label>
-        <input id="in_qty" type="number" inputmode="numeric" placeholder="輸入數量" />
-      </div>
-      <div>
-        <label>&nbsp;</label>
-        <button class="btn btn-primary" onclick="addPurchase()">新增進貨</button>
-      </div>
+      <div><label>單價</label><input id="in_price" type="number" inputmode="decimal" placeholder="輸入單價" /></div>
+      <div><label>進貨數量</label><input id="in_qty" type="number" inputmode="numeric" placeholder="輸入數量" /></div>
+      <div><label>&nbsp;</label><button class="btn btn-primary" onclick="addPurchase()">新增進貨</button></div>
     </div>
 
     <div class="actions">
-      <label class="inline">
-        <input id="clearAfterExport" type="checkbox" />
-        匯出後清空資料
-      </label>
+      <label class="inline"><input id="clearAfterExport" type="checkbox" /> 匯出後清空資料</label>
       <button class="btn btn-ok" onclick="exportExcel()">匯出 Excel（進貨/銷售/庫存）</button>
       <button class="btn btn-danger" onclick="clearAll()">全部清空</button>
     </div>
@@ -105,17 +80,7 @@
     <div id="in_summary" class="summary">今天進貨總數量：0</div>
 
     <table id="in_table">
-      <thead>
-        <tr>
-          <th>品名</th>
-          <th>貨主</th>
-          <th>Size</th>
-          <th>單價</th>
-          <th>進貨數量</th>
-          <th>時間</th>
-          <th>操作</th>
-        </tr>
-      </thead>
+      <thead><tr><th>品名</th><th>貨主</th><th>Size</th><th>單價</th><th>進貨數量</th><th>時間</th><th>操作</th></tr></thead>
       <tbody></tbody>
     </table>
   </section>
@@ -123,87 +88,51 @@
   <!-- 銷售 -->
   <section id="tabOut" class="card" style="display:none;">
     <h3>銷售</h3>
-
     <div class="row row-3">
-      <div>
-        <label>品名（從庫存選擇）</label>
-        <select id="out_name"></select>
-      </div>
-      <div>
-        <label>銷售單價</label>
-        <input id="out_price" type="number" inputmode="decimal" placeholder="輸入銷售單價" />
-      </div>
-      <div>
-        <label>銷售數量</label>
-        <input id="out_qty" type="number" inputmode="numeric" placeholder="輸入銷售數量" />
-      </div>
+      <div><label>品名（從庫存選擇）</label><select id="out_name"></select></div>
+      <div><label>銷售單價</label><input id="out_price" type="number" inputmode="decimal" placeholder="輸入銷售單價" /></div>
+      <div><label>銷售數量</label><input id="out_qty" type="number" inputmode="numeric" placeholder="輸入銷售數量" /></div>
     </div>
-
-    <div class="actions">
-      <button class="btn btn-primary" onclick="addSale()">新增銷售紀錄</button>
-    </div>
-
+    <div class="actions"><button class="btn btn-primary" onclick="addSale()">新增銷售紀錄</button></div>
     <div class="summary">目前庫存</div>
     <div id="inventoryStatus" class="card" style="padding:8px; margin-top:8px;"></div>
 
     <table id="out_table" style="margin-top:12px;">
-      <thead>
-        <tr>
-          <th>品名</th>
-          <th>單價</th>
-          <th>銷售數量</th>
-          <th>銷售總金額</th>
-          <th>時間</th>
-          <th>操作</th>
-        </tr>
-      </thead>
+      <thead><tr><th>品名</th><th>單價</th><th>銷售數量</th><th>銷售總金額</th><th>時間</th><th>操作</th></tr></thead>
       <tbody></tbody>
     </table>
   </section>
 
   <script>
   (function() {
-    // --------- 安全防護：統一錯誤顯示，避免空白頁 ---------
     function showError(err) {
-      try {
-        const box = document.getElementById('errorBox');
-        if (box) {
-          box.style.display = 'block';
-          box.textContent = '錯誤：' + (err && (err.stack || err.message || String(err)));
-        } else {
-          alert('錯誤：' + (err && (err.stack || err.message || String(err))));
-        }
-        console.error(err);
-      } catch (_) {}
+      const box = document.getElementById('errorBox');
+      box.style.display = 'block';
+      box.textContent = '錯誤：' + (err && (err.stack || err.message || String(err)));
+      console.error(err);
     }
-
     try {
-      // ===== 小工具 =====
       const $ = (id) => document.getElementById(id);
       const fmt2 = (n) => (Number.isFinite(n) ? n.toFixed(2) : '');
       const uid = () => (crypto && crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
       const nowISO = () => new Date().toISOString();
-      function escapeHTML(s) { return (s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+      const escapeHTML = (s='') => s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-      // ===== 時鐘 =====
-      function tick() { $('currentTime').innerText = '現在時間：' + new Date().toLocaleString(); }
+      function tick(){ $('currentTime').innerText = '現在時間：' + new Date().toLocaleString(); }
       setInterval(tick, 1000); tick();
 
-      // ===== Dexie 初始化（使用全域 Dexie）=====
-      if (!window.Dexie) throw new Error('Dexie 載入失敗，請確認網路或 CDN 是否可用。');
+      if (!window.Dexie) throw new Error('Dexie 載入失敗，請確認 /vendor/dexie.min.js 是否存在。');
       const db = new Dexie('invdb');
       db.version(1).stores({ movements: 'id, name, ts, type' });
 
-      // ===== Tab 切換 =====
-      window.switchTab = function(id) {
+      window.switchTab = function(id){
         $('tabIn').style.display  = id === 'tabIn'  ? '' : 'none';
         $('tabOut').style.display = id === 'tabOut' ? '' : 'none';
         $('btnTabIn').classList.toggle('active', id === 'tabIn');
         $('btnTabOut').classList.toggle('active', id === 'tabOut');
       };
 
-      // ===== 計算庫存 =====
-      async function computeInventory() {
+      async function computeInventory(){
         const all = await db.movements.toArray();
         const inv = new Map();
         for (const m of all) {
@@ -213,13 +142,11 @@
         return inv;
       }
 
-      // ===== 刷新 UI =====
-      async function refreshUI() {
+      async function refreshUI(){
         const all = await db.movements.orderBy('ts').toArray();
         const purchases = all.filter(m => m.type === 'IN');
         const sales     = all.filter(m => m.type === 'OUT');
 
-        // 進貨表格
         const inTbody = $('in_table').querySelector('tbody');
         inTbody.innerHTML = '';
         for (const p of purchases) {
@@ -235,16 +162,13 @@
           `;
           inTbody.appendChild(tr);
         }
-        inTbody.querySelectorAll('button[data-id]').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
+        inTbody.querySelectorAll('button[data-id]').forEach(btn=>{
+          btn.addEventListener('click', async (e)=>{
             const id = e.currentTarget.getAttribute('data-id');
-            if (confirm('確定刪除此筆進貨紀錄？')) {
-              await db.movements.delete(id); await refreshUI();
-            }
+            if (confirm('確定刪除此筆進貨紀錄？')) { await db.movements.delete(id); await refreshUI(); }
           });
         });
 
-        // 銷售表格
         const outTbody = $('out_table').querySelector('tbody');
         outTbody.innerHTML = '';
         for (const s of sales) {
@@ -260,60 +184,52 @@
           `;
           outTbody.appendChild(tr);
         }
-        outTbody.querySelectorAll('button[data-id]').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
+        outTbody.querySelectorAll('button[data-id]').forEach(btn=>{
+          btn.addEventListener('click', async (e)=>{
             const id = e.currentTarget.getAttribute('data-id');
-            if (confirm('確定刪除此筆銷售紀錄？')) {
-              await db.movements.delete(id); await refreshUI();
-            }
+            if (confirm('確定刪除此筆銷售紀錄？')) { await db.movements.delete(id); await refreshUI(); }
           });
         });
 
-        // 今天進貨總數
         const today = new Date(); today.setHours(0,0,0,0);
         const isToday = (iso) => { const d = new Date(iso); d.setHours(0,0,0,0); return d.getTime() === today.getTime(); };
         const inToday = purchases.filter(p => isToday(p.ts)).reduce((s, p) => s + Number(p.qty || 0), 0);
         $('in_summary').innerText = `今天進貨總數量：${inToday}`;
 
-        // 庫存與下拉
         const inv = await computeInventory();
         renderInventory(inv);
 
-        const sel = $('out_name');
-        sel.innerHTML = '';
-        [...inv.entries()].filter(([, q]) => q > 0).forEach(([name, q]) => {
+        const sel = $('out_name'); sel.innerHTML = '';
+        [...inv.entries()].filter(([, q]) => q > 0).forEach(([name, q])=>{
           const opt = document.createElement('option');
           opt.value = name; opt.textContent = `${name}（剩餘 ${q}）`;
           sel.appendChild(opt);
         });
 
-        // 品名建議
         const names = [...new Set(all.map(m => m.name))].sort();
         const dl = $('nameList'); dl.innerHTML = '';
         names.forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
       }
 
-      function renderInventory(invMap) {
+      function renderInventory(invMap){
         const div = $('inventoryStatus');
-        if (!invMap || invMap.size === 0) { div.innerHTML = `<span class="muted">尚無資料</span>`; return; }
+        if (!invMap || invMap.size === 0){ div.innerHTML = `<span class="muted">尚無資料</span>`; return; }
         const rows = [...invMap.entries()]
           .sort((a,b)=>a[0].localeCompare(b[0],'zh-Hant'))
-          .map(([name, qty]) => `<div><span class="pill">${escapeHTML(name)}</span>：剩餘 <b>${qty}</b></div>`);
+          .map(([name, qty]) => `<div><span class="pill">${name}</span>：剩餘 <b>${qty}</b></div>`);
         div.innerHTML = rows.join('');
       }
 
-      // ===== 新增進貨 =====
-      window.addPurchase = async function() {
+      window.addPurchase = async function(){
         const name = $('in_name').value.trim();
         const owner = $('in_owner').value.trim();
         const size = $('in_size').value.trim();
         const unitPrice = Number($('in_price').value);
         const qty = parseInt($('in_qty').value, 10);
 
-        if (!name || !owner || !size || !Number.isFinite(unitPrice) || !Number.isInteger(qty) || qty <= 0) {
+        if (!name || !owner || !size || !Number.isFinite(unitPrice) || !Number.isInteger(qty) || qty <= 0){
           alert('請完整填入：品名、貨主、Size、單價（數字）、進貨數量（正整數）'); return;
         }
-
         await db.movements.add({ id: uid(), type:'IN', name, owner, size, unitPrice, qty, ts: nowISO() });
 
         $('in_name').value = ''; $('in_owner').value = ''; $('in_size').value = '';
@@ -321,33 +237,30 @@
         await refreshUI();
       };
 
-      // ===== 新增銷售 =====
-      window.addSale = async function() {
+      window.addSale = async function(){
         const name = $('out_name').value;
         const unitPrice = Number($('out_price').value);
         const qty = parseInt($('out_qty').value, 10);
 
-        if (!name || !Number.isFinite(unitPrice) || !Number.isInteger(qty) || qty <= 0) {
+        if (!name || !Number.isFinite(unitPrice) || !Number.isInteger(qty) || qty <= 0){
           alert('請完整輸入銷售資訊（單價為數字、數量為正整數）'); return;
         }
 
         const inv = await computeInventory();
         const remain = inv.get(name) || 0;
-        if (remain < qty) { alert(`庫存不足：${name} 目前剩餘 ${remain}，無法銷售 ${qty}`); return; }
+        if (remain < qty){ alert(`庫存不足：${name} 目前剩餘 ${remain}，無法銷售 ${qty}`); return; }
 
         await db.movements.add({ id: uid(), type:'OUT', name, owner:'', size:'', unitPrice, qty, ts: nowISO() });
         $('out_price').value = ''; $('out_qty').value = '';
         await refreshUI();
       };
 
-      // ===== 匯出 Excel =====
-      window.exportExcel = async function() {
+      window.exportExcel = async function(){
         const all = await db.movements.orderBy('ts').toArray();
         const purchases = all.filter(m => m.type === 'IN');
         const sales     = all.filter(m => m.type === 'OUT');
 
         const wb = XLSX.utils.book_new();
-
         const inRows = [['品名','貨主','Size','單價','進貨數量','時間']];
         purchases.forEach(p => inRows.push([p.name, p.owner||'', p.size||'', Number(p.unitPrice), Number(p.qty), new Date(p.ts).toLocaleString()]));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(inRows), '進貨');
@@ -364,20 +277,18 @@
         const stamp = new Date().toISOString().replace(/[:.]/g,'-');
         XLSX.writeFile(wb, `進出貨_${stamp}.xlsx`);
 
-        if ($('clearAfterExport').checked && confirm('確定要清空所有資料嗎？此動作無法復原')) {
+        if ($('clearAfterExport').checked && confirm('確定要清空所有資料嗎？此動作無法復原')){
           await db.movements.clear(); await refreshUI();
         }
       };
 
-      // ===== 全部清空 =====
-      window.clearAll = async function() {
-        if (confirm('確定要清空所有資料嗎？此動作無法復原')) {
+      window.clearAll = async function(){
+        if (confirm('確定要清空所有資料嗎？此動作無法復原')){
           await db.movements.clear(); await refreshUI();
         }
       };
 
-      // ===== 遷移舊版 localStorage（只在 DB 空時做一次）=====
-      async function migrateFromLocalStorageIfNeeded() {
+      async function migrateFromLocalStorageIfNeeded(){
         const count = await db.movements.count(); if (count > 0) return;
         const oldPurchase = JSON.parse(localStorage.getItem('fruitData') || '[]');
         const oldSales    = JSON.parse(localStorage.getItem('salesData') || '[]');
@@ -386,31 +297,16 @@
         const now = nowISO();
         await db.transaction('rw', db.movements, async () => {
           for (const p of oldPurchase) {
-            await db.movements.add({
-              id: uid(), type:'IN',
-              name: p.name, owner: p.owner||'', size: p.size||'',
-              unitPrice: Number(p.price)||0, qty: Number(p.quantity)||0, ts: now
-            });
+            await db.movements.add({ id: uid(), type:'IN',  name:p.name, owner:p.owner||'', size:p.size||'', unitPrice:Number(p.price)||0, qty:Number(p.quantity)||0, ts:now });
           }
           for (const s of oldSales) {
-            await db.movements.add({
-              id: uid(), type:'OUT',
-              name: s.name, owner:'', size:'',
-              unitPrice: Number(s.salesPrice)||0, qty: Number(s.salesQty)||0, ts: now
-            });
+            await db.movements.add({ id: uid(), type:'OUT', name:s.name, owner:'', size:'', unitPrice:Number(s.salesPrice)||0, qty:Number(s.salesQty)||0, ts:now });
           }
         });
         alert('已從舊版 localStorage 匯入資料到新的 IndexedDB！之後會以 IndexedDB 儲存。');
-        // 視需要清掉舊資料：
-        // localStorage.removeItem('fruitData');
-        // localStorage.removeItem('salesData');
       }
 
-      // ===== 初始化 =====
-      (async function init() {
-        await migrateFromLocalStorageIfNeeded();
-        await refreshUI();
-      })();
+      (async function init(){ await migrateFromLocalStorageIfNeeded(); await refreshUI(); })();
 
     } catch (err) { showError(err); }
   })();
