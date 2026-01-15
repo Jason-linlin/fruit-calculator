@@ -6,10 +6,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>進出貨管理（純前端 / IndexedDB）</title>
 
-  <!-- SheetJS：用來匯出 Excel -->
-  https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js</script>
-  <!-- Dexie：IndexedDB 的方便封裝 -->
-  https://cdn.jsdelivr.net/npm/dexie@4.0.4/dist/dexie.mjs</script>
+  <!-- SheetJS：匯出 Excel -->
+  <script src="https://cdn/npm/xlsx/dist/xlsx.full.min.js</script>
 
   <style>
     :root {
@@ -65,7 +63,6 @@
     <div class="row row-3">
       <div>
         <label>品名</label>
-        <!-- datalist 提供歷史品名快選 -->
         <input id="in_name" list="nameList" placeholder="輸入品名或選擇" autocomplete="off" />
         <datalist id="nameList"></datalist>
       </div>
@@ -162,12 +159,12 @@
     </table>
   </section>
 
+  <!-- 主要邏輯：使用 ES Module 方式內嵌，避免任何純文字 URL 出現在頁面 -->
   <script type="module">
-    // ===== Dexie DB 設計 =====
     import Dexie from 'https://cdn.jsdelivr.net/npm/dexie@4.0.4/dist/dexie.mjs';
 
+    // ===== Dexie DB 設計 =====
     const db = new Dexie('invdb');
-    // movements: 單一資料表，記錄進貨(IN)或銷售(OUT)事件
     db.version(1).stores({
       movements: 'id, name, ts, type'  // id 為主鍵，其餘為索引
     });
@@ -184,7 +181,7 @@
     }
     setInterval(tick, 1000); tick();
 
-    // ===== Tab 切換 =====
+    // ===== Tab 切換（掛到 window 供 HTML 呼叫）=====
     window.switchTab = (id) => {
       $('tabIn').style.display  = id === 'tabIn'  ? '' : 'none';
       $('tabOut').style.display = id === 'tabOut' ? '' : 'none';
@@ -264,10 +261,7 @@
 
       // 更新「今天進貨總數量」
       const today = new Date(); today.setHours(0,0,0,0);
-      const isToday = (iso) => {
-        const d = new Date(iso); d.setHours(0,0,0,0);
-        return d.getTime() === today.getTime();
-      };
+      const isToday = (iso) => { const d = new Date(iso); d.setHours(0,0,0,0); return d.getTime() === today.getTime(); };
       const inToday = purchases.filter(p => isToday(p.ts)).reduce((s, p) => s + Number(p.qty || 0), 0);
       $('in_summary').innerText = `今天進貨總數量：${inToday}`;
 
@@ -291,11 +285,7 @@
       const names = [...new Set(all.map(m => m.name))].sort();
       const dl = $('nameList');
       dl.innerHTML = '';
-      names.forEach(n => {
-        const o = document.createElement('option');
-        o.value = n;
-        dl.appendChild(o);
-      });
+      names.forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
     }
 
     function renderInventory(invMap) {
@@ -332,7 +322,6 @@
         ts: nowISO()
       });
 
-      // 清空欄位並刷新
       $('in_name').value = '';
       $('in_owner').value = '';
       $('in_size').value = '';
@@ -377,7 +366,7 @@
       await refreshUI();
     };
 
-    // ===== 匯出 Excel =====
+    // ===== 匯出 Excel（進貨/銷售/庫存）=====
     window.exportExcel = async () => {
       const all = await db.movements.orderBy('ts').toArray();
       const purchases = all.filter(m => m.type === 'IN');
@@ -386,9 +375,7 @@
       const wb = XLSX.utils.book_new();
 
       // Sheet: 進貨
-      const inRows = [
-        ['品名','貨主','Size','單價','進貨數量','時間']
-      ];
+      const inRows = [['品名','貨主','Size','單價','進貨數量','時間']];
       purchases.forEach(p => {
         inRows.push([
           p.name, p.owner || '', p.size || '',
@@ -399,9 +386,7 @@
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(inRows), '進貨');
 
       // Sheet: 銷售
-      const outRows = [
-        ['品名','單價','銷售數量','銷售總金額','時間']
-      ];
+      const outRows = [['品名','單價','銷售數量','銷售總金額','時間']];
       sales.forEach(s => {
         const total = Number(s.unitPrice) * Number(s.qty);
         outRows.push([
@@ -414,9 +399,7 @@
       // Sheet: 庫存
       const inv = await computeInventory();
       const invRows = [['品名','現有庫存']];
-      [...inv.entries()].sort((a,b)=>a[0].localeCompare(b[0],'zh-Hant')).forEach(([n,q]) => {
-        invRows.push([n, Number(q)]);
-      });
+      [...inv.entries()].sort((a,b)=>a[0].localeCompare(b[0],'zh-Hant')).forEach(([n,q]) => invRows.push([n, Number(q)]));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(invRows), '庫存');
 
       const stamp = new Date().toISOString().replace(/[:.]/g,'-');
@@ -443,20 +426,18 @@
       return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     }
 
-    // ===== 首次載入：把你舊版 localStorage 資料自動遷移到 IndexedDB（只跑一次）=====
+    // ===== 首次載入：把舊版 localStorage 資料自動遷移到 IndexedDB（只跑一次）=====
     async function migrateFromLocalStorageIfNeeded() {
       const count = await db.movements.count();
       if (count > 0) return; // 已有資料就不遷移
 
       const oldPurchase = JSON.parse(localStorage.getItem('fruitData') || '[]');
       const oldSales    = JSON.parse(localStorage.getItem('salesData') || '[]');
-
       if (oldPurchase.length === 0 && oldSales.length === 0) return;
 
       const now = nowISO();
       await db.transaction('rw', db.movements, async () => {
         for (const p of oldPurchase) {
-          // 舊欄位：name, owner, size, price, quantity
           await db.movements.add({
             id: uid(),
             type: 'IN',
@@ -469,7 +450,6 @@
           });
         }
         for (const s of oldSales) {
-          // 舊欄位：name, salesPrice, salesQty, salesTotal
           await db.movements.add({
             id: uid(),
             type: 'OUT',
@@ -483,7 +463,7 @@
       });
 
       alert('已從舊版 localStorage 匯入資料到新的 IndexedDB！之後會以 IndexedDB 儲存。');
-      // 可選：保留或清掉舊資料
+      // 若你想清掉舊資料，取消註解下面兩行：
       // localStorage.removeItem('fruitData');
       // localStorage.removeItem('salesData');
     }
